@@ -2,12 +2,12 @@
 
 This plugin creates a table with cache counter for diferent status of models
 
-It gets a source model(supose user) and a cached model(supose intiviation to events)
+It gets a source model(supose Event) and a cached model(supose Intiviation)
 
   A user is invited to an event
-  User -> Invitation -> Event
+  Event => Invitation
 
-  How many users have/are (status)
+  How many invitations have/are (status)?
   Event => invitations
     Invitations has a status
       accepted
@@ -15,7 +15,18 @@ It gets a source model(supose user) and a cached model(supose intiviation to eve
       maybe
       pending
   
-  
+    class Event < ActiveRecord::Base
+      has_many :invitations, :dependent => :destroy
+
+    end
+
+    class Invitation < ActiveRecord::Base
+      # This method will create a namespace with is?, to?, from? for every status key.
+      # It will count all invitations ( :all ) rows. As we want :new items to be count 
+      # as pending, we add a hash :new => :pending to do so.
+      belongs_to :event, :counter_cache => {:defaults => [:all, :new => :pending ], :pending => 1, :accepted => 2, :rejected => 3, :maybe => 4 }
+      
+    end
   
 There are two default counters:
   all: counts all elements
@@ -23,16 +34,16 @@ There are two default counters:
   
 == Custom counters by convention
   
-  The counted model, the belongs to one, should have a status field (it can be specified if called different) that can be compared when is updated
-  or the current status can be seen to decrease the counter before it's destroyed.
+  The counted model, the one belonging to another, should have a status field (it can be specified if it's not called 'status') that can 
+  be compared when is updated or the current status can be seen to decrease the counter before it's destroyed.
   
   For this purpose three methods are created for every status:
   
-    *#{counter_name}.to?*
+    *status.#{counter_name}.to?*
       When the status change to counter status (increase)
-    *#{counter_name}.from?*
+    *status.#{counter_name}.from?*
       When the status moves from another counter status (decrease)
-    *#{counter_name}?*
+    *status.#{counter_name}.is?*
       When the row is being destroyed ask if this is the current status (decrease)
 
     New invitation
@@ -43,26 +54,15 @@ There are two default counters:
       invitation.status.pending.to? false
       invitation.status.pending.from? true (pending counter is decreased)
       invitation.status.accepted.to? true (accepted counter is increased)
+    
+    Invitation is destroyed
       
   *Example:
   
     @event.invitations.count_on :new
     @event.invitations.count_on :accepted
 
-  class User < ActiveRecord::Base
-    has_many :events
-    has_many :invitations, :dependent => :destroy
-    
-  end
-  
-  class Invitation < ActiveRecord::Base
-    belongs_to :event, :counter_cache => {:defaults => true} # Will count :new items and :all
-    
-    # This method will create a pending, pending?, to_pending?, from_pending? for every key
-    # it will only count the total( :all ) of rows if you want it to count :new just set defaults => true
-    belongs_to :user, :counter_cache => {:defaults => :all, :pending => 1, :accepted => 2, :rejected => 3, :maybe => 4 }
-    
-  end
+
   
 == Default :counter_cache's
    

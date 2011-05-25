@@ -17,22 +17,27 @@ module ActiveRecord
       end
 
       module MultipleCounter
-        def self.status_field_for(reflection)
-          (reflection.options[:status_field] or 'status')
-        end
+        
         def self.add_multiple_counter_cache(reflection)
           status_field_name = status_field_for(reflection)
           statuses = reflection.options[:counter_cache]
-
+          
+          class_eval <<-MAGIC, __FILE__, __LINE__ + 1
+            def #{status_field_name.pluralize}
+              
+              
+            end
+            def #{status_field_name}(counter_name)
+              reflection_name ='#{reflection.name}'
+              eval "@#{status_field_name}_#{counter_name}_accessor" ||= RelationCounter.new(self, reflection.name, counter_name, #{value})
+            end
+          MAGIC
+          
           statuses.each_pair do |type,value|
             exception = [:defaults].include?(type)
             methods = %W(#{type} #{type}? to_#{type}? from_#{type}?).map{|method| self.method_defined?(method) ? 'yes' : nil }.compact
             if methods.empty? && !exception
-              class_eval <<-MAGIC, __FILE__, __LINE__ + 1
-                def #{type}
-                  @#{type}_accessor ||= RelationCounter.new(self, reflection.name, #{type}, #{value})
-                end
-              MAGIC
+
             else
               if type == :defaults
                 class_eval <<-MAGIC, __FILE__, __LINE__ + 1
@@ -51,30 +56,73 @@ module ActiveRecord
           end
         end
         
-        class RelationCounter
-          attr_reader :record, :reflection, :name, :value
-      
-          def initialize(record, reflection_name ,status_name, status_value)
-            @record, @reflection, @name, @value = record, reflection_for(record, reflection_name), status_name, status_value
+        
+        module CounterNamespaces
+          def self.status_field_for(reflection)
+            (reflection.options[:status_field] or 'status')
           end
-          def to?
-            changes and changes.last == value
+          # Pending, Accepted, Rejected
+          class Type
+            attr_reader :value, :status, :name
+            
+            def initialize(status, status_name)
+              @status = status
+              @name = status_name
+            end
+            
+            def to_s
+              status.list[name]
+            end
+            
+            # invitation.status.pending.is?
+            def is?
+              status == self
+            end
+            
+            def to?
+              changes and changes.last == value
+            end
+            def from?
+              changes and changes.first == value
+            end
+            def changes
+              status.record.changes[status_field_name] or nil
+            end
+            def counter
+              reflection_name = status.record.reflection.name
+              source = status.record.send(reflection_name)
+              
+              cached_class_name = status.cached_class_name
+              cached_relation_name = status.cached_relation_name
+              Counter.create_or_retrieve({:source => source, :cached_class => cached_class_name, :cached_relation => cached_relation_name, :name => name})
+            end
           end
-          def from?
-            changes and changes.first == value
-          end
-          def changes
-            record.changes[status_field_name] or nil
-          end
-          #def count
-          #  Counter.where(:source_class => inverse_class_name, :source_id => source[:id], :cached_class => record.class.to_s, :name => counter_name).count
-          #end
-          private
-          def reflection_for(record, name)
-            record.class.reflections[name]
-          end
-          def inverse_class_name
-            (reflection.options[:class_name] or reflection.name.classify)
+          
+          # It represents the "status" column
+          class Status
+            attr_reader :record, :reflection, :name, :status_field
+            
+            def initialize(record, reflection_name, statuses)
+              @record, @reflection, @statuses = record, reflection_for(record, reflection_name), statuses
+              @status_field = CounterNamespaces.status_field_for(@reflection)
+            end
+            def list
+              @statuses
+            end
+            def to_s
+              record[status_field]
+            end
+            
+            def cached_class_name
+              (reflection.options[:class_name] or reflection.name.classify)
+            end
+            def cached_relation_name
+              reflection.active_record.to_s
+            end
+            private
+            def reflection_for(record, name)
+              record.class.reflections[name]
+            end
           end
         end
         def listen_changes_on_create(reflection)

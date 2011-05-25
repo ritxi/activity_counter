@@ -3,11 +3,22 @@ module ActivityCounter
     module Base
       module ClassMethods
         def validate_counter
-          send :validates_uniqueness_of, :name, :scope => [:source_class, :source_id, :cached_class], :on => :create
+          send :validates_uniqueness_of, :name, :scope => [:source_class, :source_id, :cached_class, :cached_relation], :on => :create
           send :validates_presence_of, :source_class, :source_id, :cached_class, :name
           send :validates_presence_of, :cached_relation, :if => :pluralized_class_is_relation_name
         end
+        
+        def create_or_retrieve(*options)
+          options = cleanup_params(options.first)
+          counter = self.where(options).first
+          
+          (counter.blank? ? generate!(options) : counter)
+        end
+        
         def generate(*options)
+          self.new(cleanup_params(options.first))
+        end
+        def cleanup_params(*options)
           options = options.first
           [:source, :cached_class, :name].each do |option|
             unless options.keys.include?(option)
@@ -15,8 +26,9 @@ module ActivityCounter
             end
           end
           source = options.delete(:source)
-          new_counter_options = {:source_class => source.class.to_s, :source_id => source[:id]}.merge(options)
-          self.new(new_counter_options)
+          options = {:source_class => source.class.to_s, :source_id => source[:id]}.merge(options)
+          options[:cached_relation] = options[:cached_relation].blank? ? options[:source_class].tableize : options[:cached_relation]
+          options
         end
         def generate!(*options)
           counter = generate(options.first)

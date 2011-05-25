@@ -53,6 +53,7 @@ class CounterTest < ActiveSupport::TestCase
   
   test 'counters creation' do
     @user.events << Event.new
-    assert_equal 1, Counter.count
+    assert_equal 1, @user.events.countme(:force => true)
+    assert_equal 1, @user.events.countme
   end
 end

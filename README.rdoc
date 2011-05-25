@@ -1,0 +1,62 @@
+= ActivityCounter
+
+This plugin creates a table with cache counter for diferent status of models
+
+It gets a source model(supose user) and a cached model(supose intiviation to events)
+
+There are two default counters:
+  all: counts all elements
+  new: counts new before some "status" field is updated
+  
+== Custom counters by convention
+  
+  The counted model, the belongs to one, should have a status field that can be compared when is updated
+  or the current status can be seen to decrease the counter before it's destroyed.
+  
+  For this purpose three methods are created for every status:
+  
+    *to_#{counter_name}?*
+      When the status change to counter status (increase)
+    *from_#{counter_name}?*
+      When the status moves from another counter status (decrease)
+    *#{counter_name}?*
+      When the row is being destroyed ask if this is the current status (decrease)
+
+  *Example:
+  
+    accepted => to_accepted? from_accepted? accepted?
+    rejected => to_rejected? from_rejected? rejected?
+    maybe    => to_maybe? from_maybe? maybe?
+    etc
+
+  class User < ActiveRecord::Base
+    has_many :events
+    has_many :invitations, :dependent => :destroy
+    
+  end
+  
+  class Invitation < ActiveRecord::Base
+    belongs_to :event, :counter_cache => {:defaults => true} # Will count :new items and :all
+    # This method will create a pending, pending?, to_pending?, from_pending? for every key
+    # it will only count the total( :all ) of rows if you want it to count :new just set defaults => true
+    belongs_to :user, :counter_cache => {:defaults => :all, :pending => 1, :accepted => 2, :rejected => 3, :maybe => 4 }
+    
+  end
+  
+== Default :counter_cache's
+   
+   :new
+      increase => it is being increased when a new item is created
+      decrease => when this item is updated, the counter will decrease it
+   :all
+      increase => it is being increased when a new item is created
+      decrease => it is being decreased when an item is destroyed
+  
+=== Custom :counter_cache's
+  
+   When an item is being updated the counter will be increased/decreased depending on
+   if to_#{counter}? is true (increased) or if from_#{counter}? is true (decreased).
+  
+   The updated row must have a "status" field containing the different stats of it.
+   If your model hasn't a field named "status" exactly, it can be customized by passing 
+   :status_field => 'my_status_field_name' parameter to the belongs_to method

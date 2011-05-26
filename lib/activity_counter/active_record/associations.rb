@@ -5,55 +5,51 @@ module ActiveRecord
       private
       alias_method :activity_counter_add_counter_cache_callbacks, :add_counter_cache_callbacks
       def add_counter_cache_callbacks(reflection)
-        puts "Adding counter cache"
         unless reflection.options[:counter_cache].is_a?(Hash)
-          puts "Simple version"
+          # puts "Rails version"
           activity_counter_add_counter_cache_callbacks(reflection)
         else
           MultipleCounter.add_multiple_counter_cache(reflection)
-          puts "Multiple counter cache!!! #{reflection.name}"
-          puts "#{reflection.options[:counter_cache].inspect}"
+          # puts "Multiple counter cache!!! #{reflection.name}"
+          # puts "#{reflection.options[:counter_cache].inspect}"
         end
       end
 
       module MultipleCounter
-        
         def self.add_multiple_counter_cache(reflection)
-          status_field_name = status_field_for(reflection)
+          status_field_name = CounterNamespaces.status_field_for(reflection)
           statuses = reflection.options[:counter_cache]
           
           class_eval <<-MAGIC, __FILE__, __LINE__ + 1
-            def #{status_field_name.pluralize}
+            def #{status_field_name}
               
-              
-            end
-            def #{status_field_name}(counter_name)
-              reflection_name ='#{reflection.name}'
-              eval "@#{status_field_name}_#{counter_name}_accessor" ||= RelationCounter.new(self, reflection.name, counter_name, #{value})
+              @status ||= Status.new(self,#{reflection.name})
+              @status.call(self)
+              @status
             end
           MAGIC
           
-          statuses.each_pair do |type,value|
-            exception = [:defaults].include?(type)
-            methods = %W(#{type} #{type}? to_#{type}? from_#{type}?).map{|method| self.method_defined?(method) ? 'yes' : nil }.compact
-            if methods.empty? && !exception
-
-            else
-              if type == :defaults
-                class_eval <<-MAGIC, __FILE__, __LINE__ + 1
-                  def to_new?
-                    created_at == updated_at
-                  end
-                  alias_method :new?, :to_new?
-                  def from_new?
-                    changes['updated_at'] and changes['updated_at'].first == created_at
-                  end
-                MAGIC
-              elsif !exception
-                raise "#{type} method already exists"
-              end
-            end
-          end
+          #statuses.each_pair do |type,value|
+          #  exception = [:defaults].include?(type)
+          #  methods = %W(#{type} #{type}? to_#{type}? from_#{type}?).map{|method| self.method_defined?(method) ? 'yes' : nil }.compact
+          #  if methods.empty? && !exception
+          #
+          #  else
+          #    if type == :defaults
+          #      class_eval <<-MAGIC, __FILE__, __LINE__ + 1
+          #        def to_new?
+          #          created_at == updated_at
+          #        end
+          #        alias_method :new?, :to_new?
+          #        def from_new?
+          #          changes['updated_at'] and changes['updated_at'].first == created_at
+          #        end
+          #      MAGIC
+          #    elsif !exception
+          #      raise "#{type} method already exists"
+          #    end
+          #  end
+          #end
         end
         
         
@@ -63,20 +59,22 @@ module ActiveRecord
           end
           # Pending, Accepted, Rejected
           class Type
-            attr_reader :value, :status, :name
+            attr_reader :status, :name
             
             def initialize(status, status_name)
               @status = status
               @name = status_name
             end
-            
+            def value
+              self.to_s
+            end
             def to_s
               status.list[name]
             end
             
             # invitation.status.pending.is?
             def is?
-              status == self
+              status == value
             end
             
             def to?
@@ -86,7 +84,7 @@ module ActiveRecord
               changes and changes.first == value
             end
             def changes
-              status.record.changes[status_field_name] or nil
+              status.changes
             end
             def counter
               reflection_name = status.record.reflection.name
@@ -96,15 +94,23 @@ module ActiveRecord
               cached_relation_name = status.cached_relation_name
               Counter.create_or_retrieve({:source => source, :cached_class => cached_class_name, :cached_relation => cached_relation_name, :name => name})
             end
+            def call(status)
+              @status = status
+            end
           end
           
           # It represents the "status" column
           class Status
             attr_reader :record, :reflection, :name, :status_field
             
-            def initialize(record, reflection_name, statuses)
-              @record, @reflection, @statuses = record, reflection_for(record, reflection_name), statuses
+            def initialize(record, reflection_name)
+              @record, @reflection = record, reflection_for(record, reflection_name)
+              @statuses = @reflection.options[:counter_cache].reject{|status,value| status == :default }
               @status_field = CounterNamespaces.status_field_for(@reflection)
+              list.keys.each{ |status| define_status(status)}
+            end
+            def call(record)
+              @record = record
             end
             def list
               @statuses
@@ -112,14 +118,34 @@ module ActiveRecord
             def to_s
               record[status_field]
             end
-            
+            def changed?
+              !changes.nil?
+            end
+            def after
+              changed? and changes.last
+            end
+            def before
+              changed? and changes.first
+            end
             def cached_class_name
               (reflection.options[:class_name] or reflection.name.classify)
             end
             def cached_relation_name
               reflection.active_record.to_s
             end
+            def changes
+              record.changes[status_field] or nil
+            end
             private
+            def define_status(name)
+              class_eval <<-MAGIC
+                def #{name}
+                  @#{name.to_s} ||= Type.new(self, #{name.inspect})
+                  @#{name.to_s}.call(self)
+                  @#{name.to_s}
+                end
+              MAGIC
+            end
             def reflection_for(record, name)
               record.class.reflections[name]
             end
@@ -127,7 +153,6 @@ module ActiveRecord
         end
         def listen_changes_on_create(reflection)
           statuses = reflection.options[:counter_cache]
-        
         end
       
         def listen_changes_on_update(reflection)

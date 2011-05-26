@@ -42,18 +42,4 @@ class CounterTest < ActiveSupport::TestCase
     counter.decrease
     assert_equal(0, counter.count)
   end
-  
-  test 'get source and cached items' do
-    @user.events << Event.new
-    counter = new_event_counter(@user)
-    event = @user.events.first
-    assert_equal(@user, counter.source)
-    assert_equal(@user.events, counter.cached_items)
-  end
-  
-  test 'counters creation' do
-    @user.events << Event.new
-    assert_equal 1, @user.events.countme(:force => true)
-    assert_equal 1, @user.events.countme
-  end
 end

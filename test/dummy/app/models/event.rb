@@ -1,5 +1,5 @@
 class Event < ActiveRecord::Base
-  belongs_to :organizer, :class_name => "User", :foreign_key => "user_id", :counter_cache => {:defaults => true}
+  belongs_to :user, :counter_cache => {:defaults => true}
   has_many :invitees, :foreign_key => 'event_id', :class_name => 'Invitation', :dependent => :destroy
   #counter_cache_for :invitiations, :when_is => [:total, :new, :accepted, :rejected, :maybe]
   #cache_for :invitiations do |observe|

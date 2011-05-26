@@ -56,11 +56,11 @@ There are two default counters:
       invitation.status.accepted.to? true (accepted counter is increased)
     
     Invitation is destroyed
-      
+      invitation.status.accepted.is? true (accepted counter is decreased)
   *Example:
   
-    @event.invitations.count_on :new
-    @event.invitations.count_on :accepted
+    @event.invitations.pending.count
+    @event.invitations.accepted.count
 
 
   

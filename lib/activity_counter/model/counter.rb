@@ -3,15 +3,13 @@ module ActivityCounter
     module Counter
       module ClassMethods
         def validate_counter
-          send :validates_uniqueness_of, :name, :scope => [:source_class, :source_id, :cached_relation], :on => :create
-          send :validates_presence_of, :source_class, :source_id, :cached_class, :name
-          send :validates_presence_of, :cached_relation, :if => :pluralized_class_is_relation_name
+          send :validates_uniqueness_of, :name, :scope => [:source_class, :source_id, :source_relation], :on => :create
+          send :validates_presence_of, :source_class, :source_id, :source_relation, :name
         end
         
         def create_or_retrieve(*options)
           options = cleanup_params(options.first)
           counter = self.where(options).first
-          
           (counter.blank? ? generate!(options) : counter)
         end
         
@@ -21,41 +19,49 @@ module ActivityCounter
         
         def split_source(options)
           @source = options.delete(:source)
-          {:source_class => @source.class.to_s, :source_id => @source[:id]}.merge(options)
+          p @source
+          { :source_class => @source.class.to_s, :source_id => @source[:id] }.merge(options)
         end
         
         def find_reflection_name(options)
           case
           when options[:reverse] then
-            reverse = options.delete(:reverse)
-            options[:source_reflection] = reverse.reverseme.name
-          when options[:cached_class] then
-            cached_class = options.delete(:cached_class)
-            
+            options[:source_relation] = options.delete(:reverse).reverseme.name
+          when options[:auto] then
+            auto = options.delete(:auto)
+            raise "unsuported relation #{auto.macro}" unless [:belongs_to, :has_many].include?(auto.macro)
+            (auto.macro == :belongs_to and options[:reverse] = auto) or options[:reflection] = auto
+            options = find_reflection_name(options)
           when options[:reflection] then
-            reflection = options.delete(:reflection)
-            options[:source_reflection] = reflection.name
+            options[:source_relation] = options.delete(:reflection).name
           end
           options
         end
         
-        # :source => object that has many items
-        #   :reverse => reflection on the belongs to side
-        #   :cached_class => class that belongs to other one
-        #   :reflection => has_many reflection of the source side
-        # :name => counter name
+        ###=====================================================###
+        ## Parameters description                                ##
+        ###-----------------------------------------------------###
+        ## - :source => object that has many items               ##
+        ## - :name => counter name                               ##
+        ###-----------------------------------------------------###
+        ## Only one of them can be passed                        ##
+        ## - :reverse => belongs to side reflection              ##
+        ## - :auto => it discovers the given reflection type     ##
+        ## - :reflection => has many side reflection             ##
+        ## - :source_relation => it's the has_many relation name ##
+        ###=====================================================###
         def cleanup_params(*options)
           options = options.first
-          [:source, [:reverse, :reflection], :name].each do |option|
-            if option.is_a?(Array)
-              option.each{|new_options| validate_option(options, new_options)}
+          [:source, [:reverse, :auto, :reflection, :source_relation], :name].each do |expected|
+            if expected.is_a?(Array)
+              validate_one_is_present(expected, options)
             else
-              validate_option(options, option)
+              validate_option(options, expected)
             end
           end
           
           options = split_source(options)
-          
+          options = find_reflection_name(options)
           options
         end
         def generate!(*options)
@@ -64,43 +70,32 @@ module ActivityCounter
           counter
         end
         private
+        def validate_one_is_present(expected, given_options)
+          found = expected.reject{|new_option| !given_options.keys.include?(new_option)}
+          if found.empty?
+            raise "Non of the following params found: #{expected.inspect}"
+          elsif found.size > 1
+            raise "Only one of the following can be present: #{found.inspect}"
+          end
+        end
         def validate_option(options, option)
           unless options.keys.include?(option)
             raise "missing parameter #{option} at #{self.class.to_s}.generate method"
           end
         end
-          
       end
       module InstanceMethods
-        
-        # belongs_to relation
-        def belongs_to_relation_name
-          self[:cached_relation].blank? ? source_class.tableize : self[:cached_relation]
-        end
-        alias_method :cached_relation, :belongs_to_relation_name
         def source
           eval("#{source_class}.find(#{source_id})")
         end
+        def cached_items
+          source.send(source_relation)
+        end
         def increase
-          update_attribute(:count, self[:count]+1)
+          self.class.increment_counter('count', self[:id])
         end
         def decrease
-          self[:count] > 0 and update_attribute(:count, self[:count]-1)
-        end
-        def cached_items
-          # Not working with relations having custom names yet!!!
-          cached_class.tableize
-          source.send(cached_class.tableize)
-        end
-        
-        def pluralized_class_is_relation_name
-          unless source_class.blank?
-            #puts "source_class: #{source_class}"
-            has_relation = eval(source_class).reflections.keys.include?(cached_relation)
-            if self[:cached_relation].blank? && !has_relation
-              errors[:cached_relation] << "No relation found named #{cached_relation} for #{self[:cached_class]}"
-            end
-          end
+          self.class.decrement_counter('count', self[:id])
         end
       end
     end

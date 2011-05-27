@@ -20,7 +20,7 @@ module ActiveRecord
           status_field_name = CounterNamespaces.status_field_for(reflection)
           statuses = reflection.options[:counter_cache]
           
-          class_eval <<-MAGIC, __FILE__, __LINE__ + 1
+          instance_eval <<-MAGIC, __FILE__, __LINE__ + 1
             def #{status_field_name}
               
               @status ||= Status.new(self,#{reflection.name})

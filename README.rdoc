@@ -1,34 +1,26 @@
 = ActivityCounter
 
-This plugin creates a table with cache counter for diferent status of models
-
-It gets a source model(supose Event) and a cached model(supose Intiviation)
-
-  A user is invited to an event
-  Event => Invitation
-
-  How many invitations have/are (status)?
-  Event => invitations
-    Invitations has a status
-      accepted
-      rejected
-      maybe
-      pending
+== Counter
   
-    class Event < ActiveRecord::Base
-      has_many :invitations, :dependent => :destroy
+   Figure we have an Event model that has many invitations. We want to know how many Invitations have status: accepted, rejected, pending or maybe.
+   
+   To do so we define a Source module and a Cached module we will load then into classes that match these roles.
+   
+   Counter Module
+   
+     This is the module were counting actions are defined. This method has the following fields:
+     
+       - :source_class
+       - :source_id
+         :source_class and :source_id gives us the source model instance.
+     
+       - :source_relation the name of the relation that will let us know
+         the collection of items.
+     
+       - :name is the name of the counter. This is the status we want to count.
+       - :count is the number of items count.
 
-    end
-
-    class Invitation < ActiveRecord::Base
-      # This method will create a namespace with is?, to?, from? for every status key.
-      # It will count all invitations ( :all ) rows. As we want :new items to be count 
-      # as pending, we add a hash :new => :pending to do so.
-      belongs_to :event, :counter_cache => {:defaults => [:all, :new => :pending ], :pending => 1, :accepted => 2, :rejected => 3, :maybe => 4 }
-      
-    end
-  
-There are two default counters:
+== There are two default counters:
   all: counts all elements
   new: counts new before some "status" field is updated
   
@@ -38,32 +30,16 @@ There are two default counters:
   be compared when is updated or the current status can be seen to decrease the counter before it's destroyed.
   
   For this purpose three methods are created for every status:
-  
-    *status.#{counter_name}.to?*
-      When the status change to counter status (increase)
-    *status.#{counter_name}.from?*
-      When the status moves from another counter status (decrease)
-    *status.#{counter_name}.is?*
-      When the row is being destroyed ask if this is the current status (decrease)
+    
+    @invitation.status.current (current status)
+    @invitation.status.old (status before update)
+    @invitation.status.new (status after update)
 
-    New invitation
-      invitation.status.pending.to? true (pending counter is increased)
-      invitation.status.pending.from? false
-    
-    User updates his status to accepted
-      invitation.status.pending.to? false
-      invitation.status.pending.from? true (pending counter is decreased)
-      invitation.status.accepted.to? true (accepted counter is increased)
-    
-    Invitation is destroyed
-      invitation.status.accepted.is? true (accepted counter is decreased)
-  *Example:
+  Source class collection accessor method has method for every counter so we can access them.
   
     @event.invitations.pending.count
     @event.invitations.accepted.count
 
-
-  
 == Default :counter_cache's
    
    :new
@@ -72,12 +48,3 @@ There are two default counters:
    :all
       increase => it is being increased when a new item is created
       decrease => it is being decreased when an item is destroyed
-  
-=== Custom :counter_cache's
-  
-   When an item is being updated the counter will be increased/decreased depending on
-   if #{counter}.to? is true (increased) or if #{counter}.from? is true (decreased).
-  
-   The updated row must have a "status" field containing the different stats of it.
-   If your model hasn't a field named "status" exactly, it can be customized by passing 
-   :status_field => 'my_status_field_name' parameter to the belongs_to method

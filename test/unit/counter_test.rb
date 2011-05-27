@@ -6,13 +6,13 @@ class CounterTest < ActiveSupport::TestCase
     @user = User.create
     @user2 = User.create
   end
-  def new_counter(source, cached_class, counter_name, *options)
+  def new_counter(source, counter_name, *options)
     options = options.first.blank? ? {} : options.first
-    counter_options = {:source => source, :cached_class => cached_class, :name => counter_name}.merge(options)
+    counter_options = {:source => source, :name => counter_name}.merge(options)
     Counter.generate(counter_options)
   end
   def new_event_counter(user)
-    new_counter(user, 'Event', 'total', :cached_relation => 'organizer')
+    new_counter(user, 'total', :source_relation => 'events')
   end
   test "acts_as_counter method presence" do
     assert User.public_methods.include?('acts_as_activity_counter')
@@ -24,7 +24,7 @@ class CounterTest < ActiveSupport::TestCase
   end
   
   test "have all attributes set" do
-    counter = new_counter(@user, 'Event', nil, :cached_relation => 'organizer')
+    counter = new_counter(@user, nil, :source_relation => 'events')
     assert(!counter.save)
     assert_equal(counter.errors.keys, [:name])
     counter.name = 'total'

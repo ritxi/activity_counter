@@ -19,8 +19,7 @@ module ActivityCounter
         
         def split_source(options)
           @source = options.delete(:source)
-          p @source
-          { :source_class => @source.class.to_s, :source_id => @source[:id] }.merge(options)
+          @source ? { :source_class => @source.class.to_s, :source_id => @source[:id] }.merge(options) : options
         end
         
         def find_reflection_name(options)
@@ -85,6 +84,15 @@ module ActivityCounter
         end
       end
       module InstanceMethods
+        def counter_changed?
+          @counter_changed
+        end
+        def counter_changed!
+          @counter_changed = true
+        end
+        def counter_unchanged!
+          @counter_changed = false
+        end
         def source
           eval("#{source_class}.find(#{source_id})")
         end
@@ -92,10 +100,19 @@ module ActivityCounter
           source.send(source_relation)
         end
         def increase
-          self.class.increment_counter('count', self[:id])
+          self.class.increment_counter(:count, self[:id])
+          counter_changed!
         end
         def decrease
-          self.class.decrement_counter('count', self[:id])
+          self.class.decrement_counter(:count, self[:id])
+          counter_changed!
+        end
+        def count
+          if counter_changed?
+            counter_unchanged!
+            self.reload
+          end
+          self[:count]
         end
       end
     end

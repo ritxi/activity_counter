@@ -3,43 +3,52 @@ require 'test_helper'
 
 class CounterTest < ActiveSupport::TestCase
   def setup
-    @user = User.create
-    @user2 = User.create
+    @event = Event.create
+    
   end
   def new_counter(source, counter_name, *options)
     options = options.first.blank? ? {} : options.first
     counter_options = {:source => source, :name => counter_name}.merge(options)
     Counter.generate(counter_options)
+    
+    
+    
   end
-  def new_event_counter(user)
-    new_counter(user, 'total', :source_relation => 'events')
+  def new_event_invitation_counter(event)
+    new_counter(event, :pending, :source_relation => :invitees)
   end
   test "acts_as_counter method presence" do
-    assert User.public_methods.include?('acts_as_activity_counter')
-    assert User.private_methods.include?("add_counter_cache_callbacks")
+    assert Event.public_methods.include?('acts_as_activity_counter')
+    assert Event.private_methods.include?("add_counter_cache_callbacks")
   end
   test "counter uniqueness" do
-    assert new_event_counter(@user).save
-    assert !new_event_counter(@user).save
+    assert  new_event_invitation_counter(@event).save
+    assert !new_event_invitation_counter(@event).save
   end
   
   test "have all attributes set" do
-    counter = new_counter(@user, nil, :source_relation => 'events')
-    assert(!counter.save)
-    assert_equal(counter.errors.keys, [:name])
-    counter.name = 'total'
-    assert(counter.save)
+    counter = new_counter(@event, nil, :source_relation => :invitees)
+    assert !counter.save
+    assert_equal counter.errors.keys, [:name]
+    counter.name = 'invitees'
+    assert counter.save
   end
   
   test 'increase/decrease counter by 1' do
-    counter = new_event_counter(@user)
+    counter = new_event_invitation_counter(@event)
     counter.save
-    assert_equal(0, counter.count)
+    assert_equal 0, counter.count
+    
     counter.increase
-    assert_equal(1, counter.count)
+    assert_equal 1, counter.count
+    
+    counter.increase
+    assert_equal 2, counter.count
+    
     counter.decrease
-    assert_equal(0, counter.count)
+    assert_equal 1, counter.count
+    
     counter.decrease
-    assert_equal(0, counter.count)
+    assert_equal 0, counter.count
   end
 end

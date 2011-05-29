@@ -5,12 +5,13 @@ module ActiveRecord
     class MacroReflection
       # Gets the belongs_to relation on the has_many side
       def reverseme
-        puts "#{reverse_class}.#{reverse_reflection_by_class.first}"
+        #puts "#{reverse_class}.#{reverse_reflection_by_class.first}"
         @reverseme ||= reverse_class.instance_methods.include?(reverse_reflection_name.to_s) ? reverse_reflection_by_class : reverse_reflection_by_custom_name
       end
-
+      def status_column_name
+        (options[:status_field] or "status").to_sym
+      end
       private
-
       def reverse_class
         klass
       end
@@ -20,7 +21,6 @@ module ActiveRecord
 
       def reverse_reflection_name(reversed_name = nil)
         reversed_name ||= source_class_name
-        
         macro == :has_many ? reversed_name.underscore.to_sym : reversed_name.tableize.to_sym
       end
       def source_class_name

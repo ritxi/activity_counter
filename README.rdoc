@@ -12,9 +12,9 @@
      
        - :source_class
        - :source_id
-         :source_class and :source_id gives us the source model instance.
+          class and id gives us the source model instance.
      
-       - :source_relation the name of the relation that will let us know
+       - :source_relation is the name of the relation that will let us know
          the collection of items.
      
        - :name is the name of the counter. This is the status we want to count.
@@ -26,19 +26,19 @@
   
 == Custom counters by convention
   
-  The counted model, the one belonging to another, should have a status field (it can be specified if it's not called 'status') that can 
+  The counted model, the one belonging to another, should have a status column (it can be specified with the param :status_field if it's not called 'status') that can 
   be compared when is updated or the current status can be seen to decrease the counter before it's destroyed.
   
   For this purpose three methods are created for every status:
     
     @invitation.status.current (current status)
-    @invitation.status.old (status before update)
-    @invitation.status.new (status after update)
+    @invitation.status.before (status before update)
+    @invitation.status.after (status after update)
 
   Source class collection accessor method has method for every counter so we can access them.
-  
-    @event.invitations.pending.count
-    @event.invitations.accepted.count
+    @event.invitations.pending => invitations scoped by pending status
+    @event.invitations.pending.count => pending invitations count
+
 
 == Default :counter_cache's
    

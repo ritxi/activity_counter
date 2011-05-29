@@ -3,7 +3,7 @@ require 'test_helper'
 
 class EventInvitationTest < ActiveSupport::TestCase
   def setup
-    @event = Event.new
+    @event = Event.create
   end
   
   test "reverse reflections" do
@@ -15,15 +15,23 @@ class EventInvitationTest < ActiveSupport::TestCase
   end
   
   test "presence of counters accessors" do
+
+    @event.invitees.pending
+    @event.invitees.accepted
+    @event.invitees.rejected
     assert @event.invitees.respond_to?(:pending)
     assert @event.invitees.respond_to?(:accepted)
     assert @event.invitees.respond_to?(:rejected)
   end
   test "event invitations counter increase on create" do
-    @event.invitees << Invitation.new
+    #puts "This is the owner accessor #{@event.invitees.owner.inspect}"
+    
+    
+    invitation = Invitation.new
     assert_equal(0, @event.invitees.pending.count)
-    #
-    #assert_equal(1, @event.invitees.pending.count)
+    @event.invitees << Invitation.new
+
+    assert_equal(1, @event.invitees.pending.count)
   end
   #test "event invitations counter increase/decrease on update" do
   #  @event.invitees << Invitation.new

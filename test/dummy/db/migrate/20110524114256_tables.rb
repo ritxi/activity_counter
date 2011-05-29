@@ -6,7 +6,7 @@ class Tables < ActiveRecord::Migration
       t.timestamps
     end
     create_table :invitations, :force => true do |t|
-      t.string  :status
+      t.string  :estat
       t.integer :user_id
       t.integer :event_id
       t.timestamps

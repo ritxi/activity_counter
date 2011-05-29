@@ -38,29 +38,32 @@ module ActivityCounter
         end
         
         ###=====================================================###
-        ## Parameters description                                ##
+         # Parameters description                                #
         ###-----------------------------------------------------###
-        ## - :source => object that has many items               ##
-        ## - :name => counter name                               ##
+         # - :source => object that has many items               #
+         # - :name => counter name                               #
         ###-----------------------------------------------------###
-        ## Only one of them can be passed                        ##
-        ## - :reverse => belongs to side reflection              ##
-        ## - :auto => it discovers the given reflection type     ##
-        ## - :reflection => has many side reflection             ##
-        ## - :source_relation => it's the has_many relation name ##
+         # Only one of them can be passed                        #
+         # - :reverse => belongs to side reflection              #
+         # - :auto => it discovers the given reflection type     #
+         # - :reflection => has many side reflection             #
+         # - :source_relation => it's the has_many relation name #
         ###=====================================================###
+        
         def cleanup_params(*options)
           options = options.first
-          [:source, [:reverse, :auto, :reflection, :source_relation], :name].each do |expected|
-            if expected.is_a?(Array)
-              validate_one_is_present(expected, options)
-            else
-              validate_option(options, expected)
+          unless [:source_id, :source_class, :source_relation, :name].reject{|option| options.include?(option)}.blank?
+            [:source, [:reverse, :auto, :reflection, :source_relation], :name].each do |expected|
+              if expected.is_a?(Array)
+                validate_one_is_present(expected, options)
+              else
+                validate_option(options, expected)
+              end
             end
-          end
           
-          options = split_source(options)
-          options = find_reflection_name(options)
+            options = split_source(options)
+            options = find_reflection_name(options)
+          end
           options
         end
         def generate!(*options)
@@ -79,7 +82,10 @@ module ActivityCounter
         end
         def validate_option(options, option)
           unless options.keys.include?(option)
+            #puts "option:  #{option.inspect}"
+            #puts "options: #{options.inspect}"
             raise "missing parameter #{option} at #{self.class.to_s}.generate method"
+          
           end
         end
       end

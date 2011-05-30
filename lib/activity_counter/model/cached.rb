@@ -18,17 +18,11 @@ module ActivityCounter
         end
         ## Add status_update methods and trigger them to their events
         def configure_cached_class(reflection)
-          status_column_name= reflection.status_column_name
-          reflection_name= reflection.name
+          self.status_column_name= reflection.status_column_name
+          self.reflection_name= reflection.name
           puts "#{self.to_s}: Configuring cached model"
           send(:include, InstanceMethods)
           
-          instance_eval <<-MAGIC
-            def #{status_column_name}
-              @status ||= Status.new(self, self.class.reflection_name)
-              @status.send(:call, self)
-            end
-          MAGIC
           
           after_create   :update_status_counter_on_create
           after_update   :update_status_counter_on_change
@@ -41,12 +35,17 @@ module ActivityCounter
         def status_column_name
           self.class.status_column_name
         end
+        def status
+          @status ||= Status.new(self, self.class.reflection_name)
+          @status.send(:call, self)
+        end
         def on_create_default_counter
-          puts "status column name: #{status_column_name.inspect}"
-          puts "status nil?: #{self[status_column_name].nil?.inspect}"
-          puts "status method accessor found: #{respond_to? status_column_name}"
-          if new_record?
+          #puts "status column name: #{status_column_name.inspect}"
+          #puts "status nil?: #{self[status_column_name].nil?.inspect}"
+          #puts "status method accessor found: #{respond_to? status_column_name}"
+          if new_record? && self[status_column_name].nil?
             self[status_column_name] = send(status_column_name).default
+            puts "Default status column value: #{self[status_column_name]}"
           end
         end
         def update_status_counter_on_create
@@ -64,7 +63,20 @@ module ActivityCounter
           puts "update on destroy"
           send(status_column_name).current.counter.decrease
         end
-        
+        def method_missing(name, *args)
+          if name == self.class.status_column_name
+            eval <<-MAGIC
+              def #{name}
+                puts "reflection: #{self.class.reflection_name}"
+                puts "column: #{self.class.status_column_name}"
+                status
+              end
+            MAGIC
+            send name
+          else
+            super
+          end
+        end
         # It represents the "status" column for the current instance
         # .status => this name might change
         #   .list                 => known statuses list
@@ -86,7 +98,7 @@ module ActivityCounter
             @statuses = @reflection.options[:counter_cache].reject{|status,value| status == :default }
             @status_field = @record.status_column_name
 
-            list.keys.each{ |status| define_status(status)}
+            
           end
           def list
             @statuses
@@ -144,7 +156,7 @@ module ActivityCounter
             counter(status_name_for(value))
           end
           def counter(name)
-            @counter[name] ||= Counter.create_or_retrieve(:source => @owner, :auto => @reflection, :name => name)
+            @counter[name] ||= ::Counter.create_or_retrieve(:source => @owner, :auto => @reflection, :name => name)
           end
           def reflection_for(record, name)
             record.class.reflections[name]

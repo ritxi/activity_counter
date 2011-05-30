@@ -10,7 +10,11 @@ module ActivityCounter
         def create_or_retrieve(*options)
           options = cleanup_params(options.first)
           counter = self.where(options).first
-          (counter.blank? ? generate!(options) : counter)
+          if counter.blank?
+            generate!(options)
+          else
+            counter
+          end
         end
         
         def generate(*options)
@@ -25,7 +29,7 @@ module ActivityCounter
         def find_reflection_name(options)
           case
           when options[:reverse] then
-            options[:source_relation] = options.delete(:reverse).reverseme.name
+            options[:source_relation] = options.delete(:reverse).reverseme.first
           when options[:auto] then
             auto = options.delete(:auto)
             raise "unsuported relation #{auto.macro}" unless [:belongs_to, :has_many].include?(auto.macro)
@@ -52,7 +56,11 @@ module ActivityCounter
         
         def cleanup_params(*options)
           options = options.first
-          unless [:source_id, :source_class, :source_relation, :name].reject{|option| options.include?(option)}.blank?
+          missing = keep_missing(options)
+          unless missing.blank?
+            puts ""
+            puts "missing: #{missing.inspect}"
+            puts "options: #{options.inspect}"
             [:source, [:reverse, :auto, :reflection, :source_relation], :name].each do |expected|
               if expected.is_a?(Array)
                 validate_one_is_present(expected, options)
@@ -72,6 +80,9 @@ module ActivityCounter
           counter
         end
         private
+        def keep_missing(given_options)
+          [:source_id, :source_class, :source_relation, :name].reject{|option| given_options.include?(option)}
+        end
         def validate_one_is_present(expected, given_options)
           found = expected.reject{|new_option| !given_options.keys.include?(new_option)}
           if found.empty?

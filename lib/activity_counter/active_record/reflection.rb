@@ -38,7 +38,6 @@ module ActiveRecord
           
           same_class_name = (name.to_s == reverse_reflection_class_name)
           diferent_name = (reverse_reflection.options[:class_name] && reverse_reflection.options[:class_name].to_s == source_class_name)
-          #puts "#{name.to_s} == #{reverse_reflection_class_name} ? #{same_class_name.inspect}"
           
           !(same_class_name or diferent_name)
         }
@@ -48,7 +47,7 @@ module ActiveRecord
         when reversed_reflection.count > 1 then
           raise("Too many(#{reverse.count}) reverse reflections found for #{source_class_name}.#{name}:\n#{reverse.inspect}")
         else
-          Array(reversed_reflection).first
+          Array(reversed_reflection).first # [:reflection_name, reflection]
         end
       end
     end

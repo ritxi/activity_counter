@@ -5,7 +5,7 @@ class Invitation < ActiveRecord::Base
     :accepted => 2,
     :rejected => 3
   }
-  belongs_to :event, :counter_cache => {:default => {:new => :pending}}.merge(STATUS), :status_field => :estat 
+  belongs_to :event, :counter_cache => {:default => {:new => :pending}}.merge(STATUS), :status_field => :estat
   belongs_to :user
   
   

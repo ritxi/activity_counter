@@ -24,6 +24,13 @@
   all: counts all elements
   new: counts new before some "status" field is updated
   
+  :default => true # it defines [:all, :new] counters
+  
+  :default => [:new] # it will define :new counter only
+  
+  :default => [:new_simple, :new] # adds :new and :new_simple. This last one only counts new items, it's descreased manualy by calling reset!
+  
+  
 == Custom counters by convention
   
   The counted model, the one belonging to another, should have a status column (it can be specified with the param :status_field if it's not called 'status') that can 

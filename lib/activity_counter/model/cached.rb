@@ -22,11 +22,46 @@ module ActivityCounter
           self.reflection_name= reflection.name
           send(:include, InstanceMethods)
           
+          # Custom status based counters
           after_create   :update_status_counter_on_create
           after_update   :update_status_counter_on_change
           before_destroy :update_status_counter_on_destroy
+          
+        end
+        private
+        def define_default_counters(counters)
+          counters.each do |counter|
+            case counter
+            when :total then define_total_counter
+            when :new_default then define_new_default
+            when :new_simple  then define_new_simple
+            end
+          end
+        end
+        def define_total_counter
+          # Default counters
+          after_create   {|item| item.total.increase}
+          before_destroy {|item| item.total.decrease}
+        end
+
+        def define_new_default
+          send :include, DefaultCounters
+          after_create {|item| item.counter_new.increase }
+          after_update :decrease_new_on_updated_at_distinct_of_created_at
+        end
+
+        def define_new_simple
+          after_create {|item| item.counter_new.increase }
         end
       end
+      module DefaultCounters
+        def decrease_new_on_updated_at_distinct_of_created_at
+          if changes[:updated_at].first == created_at
+            counter_new.decrease
+          end
+        end
+      end
+        
       module InstanceMethods
         def status_column_name
           self.class.status_column_name
@@ -58,6 +93,9 @@ module ActivityCounter
         def update_status_counter_on_destroy
           status.current.decrease
         end
+        
+        
+        
         def method_missing(name, *args)
           if name == self.class.status_column_name
             eval <<-MAGIC

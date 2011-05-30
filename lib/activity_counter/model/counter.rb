@@ -112,6 +112,13 @@ module ActivityCounter
         def source
           eval("#{source_class}.find(#{source_id})")
         end
+        def reset!
+          update_attribute(:count, 0)
+        end
+        def reload!
+          new_count = cached_items.send(name).count
+          update_attribute(:count, new_count) unless new_count == self[:count]
+        end
         def cached_items
           source.send(source_relation)
         end

@@ -8,10 +8,11 @@ module ActivityCounter
         end
         
         def create_or_retrieve(*options)
-          options = cleanup_params(options.first)
-          counter = self.where(options).first
+          dirty_options = options.first
+          options_cleaned = cleanup_params(dirty_options)
+          counter = self.where(options_cleaned).first
           if counter.blank?
-            generate!(options)
+            generate!(options_cleaned)
           else
             counter
           end
@@ -29,7 +30,8 @@ module ActivityCounter
         def find_reflection_name(options)
           case
           when options[:reverse] then
-            options[:source_relation] = options.delete(:reverse).reverseme.first
+            reverse = options.delete(:reverse).reverseme
+            options[:source_relation] = reverse.name # reflection name
           when options[:auto] then
             auto = options.delete(:auto)
             raise "unsuported relation #{auto.macro}" unless [:belongs_to, :has_many].include?(auto.macro)
@@ -39,6 +41,9 @@ module ActivityCounter
             options[:source_relation] = options.delete(:reflection).name
           end
           options
+        end
+        def find_source(reflection)
+          (reflection.macro == :belongs_to and reflection.active_record) or reflection.reverseme.active_record
         end
         
         ###=====================================================###
@@ -58,9 +63,6 @@ module ActivityCounter
           options = options.first
           missing = keep_missing(options)
           unless missing.blank?
-            puts ""
-            puts "missing: #{missing.inspect}"
-            puts "options: #{options.inspect}"
             [:source, [:reverse, :auto, :reflection, :source_relation], :name].each do |expected|
               if expected.is_a?(Array)
                 validate_one_is_present(expected, options)
@@ -68,7 +70,7 @@ module ActivityCounter
                 validate_option(options, expected)
               end
             end
-          
+            
             options = split_source(options)
             options = find_reflection_name(options)
           end
@@ -93,10 +95,7 @@ module ActivityCounter
         end
         def validate_option(options, option)
           unless options.keys.include?(option)
-            #puts "option:  #{option.inspect}"
-            #puts "options: #{options.inspect}"
             raise "missing parameter #{option} at #{self.class.to_s}.generate method"
-          
           end
         end
       end

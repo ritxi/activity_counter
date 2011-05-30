@@ -4,13 +4,12 @@ module ActiveRecord
     class AssociationCollection < AssociationProxy
       attr_reader :counter_cache_options_without_default
       def owner
-        #define_counters_accessor
         @owner
       end
       alias_method :activity_count_initialize, :initialize
       def initialize(owner, reflection)
         activity_count_initialize(owner, reflection)
-        @counter_cache_options = reflection.reverseme.last.options[:counter_cache]
+        @counter_cache_options = reflection.reverseme.options[:counter_cache]
         @counter_cache_options_without_default = @counter_cache_options.reject{ |key,value| key == :default }
         @internal_counter = InternalCounter.new(@owner, @reflection, self)
       end
@@ -35,14 +34,16 @@ module ActiveRecord
           @owner          = owner
           @reflection     = reflection
           @collection     = collection
+          @status_column  = @reflection.status_column_name
           # statuses hash list
           @counter_caches = collection.counter_cache_options_without_default
         end
         def to_s
-          @collection.where(:status => @counter_caches[@current_counter])
+          @collection.where( @status_column => @counter_caches[@current_counter] )
         end
-        def count
-          counter.count
+        def count(options={})
+          options = {:force => false}.merge(options)
+          options[:force] ? self.to_s.count : counter.count
         end
         private
         def call(counter_name)

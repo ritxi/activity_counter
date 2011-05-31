@@ -1,7 +1,7 @@
 require 'test_helper'
 #require 'fixtures/sample_mail'
 
-class EventInvitationTest < ActiveSupport::TestCase
+class EventInvitationsTest < ActiveSupport::TestCase
   def setup
     @event = Event.create
     @invitation = Invitation.new
@@ -36,6 +36,7 @@ class EventInvitationTest < ActiveSupport::TestCase
     assert_equal([:pending, :accepted], Counter.all.map{|c| c.name.to_sym })
     assert_equal(0, @event.invitees.pending.count(:force => true))
     assert_equal(1, @event.invitees.accepted.count(:force => true))
+    assert_equal(:accepted, @invitation.status.current.name)
   end
   test "event invitations counter decrease on destroy" do
     @event.invitees << @invitation

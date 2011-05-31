@@ -3,6 +3,7 @@ module ActiveRecord
   # = Active Record Reflection
   module Reflection
     class MacroReflection
+      attr_reader :default_counters
       # Gets the belongs_to relation on the has_many side
       def reverseme
         @reverseme ||= if reverse_class.instance_methods.include?(reverse_reflection_name.to_s)
@@ -13,6 +14,24 @@ module ActiveRecord
       end
       def status_column_name
         (is_belongs_to? and (options[:status_field] or :status).to_sym) or reverseme.status_column_name
+      end
+      def load_default_counters
+        @default_counters = []
+        if @defaults == true
+          @default_counters = [:total, :new_default]
+        elsif @defaults.is_a?(Array)
+          @defaults.each do |default|
+            case default
+            when :total then @default_counters << :total
+            when :new then @default_counters << :new_default
+            when :new_default then @default_counters << :new_default
+            when :new_simple then @default_counters << :new_simple
+            end
+          end
+        end
+      end
+      def has_status_counter?
+        (is_belongs_to? and options[:counter_cache] and options[:counter_cache].reject{|k,v| k == :default }.keys.count > 1)
       end
       private
       def is_belongs_to?

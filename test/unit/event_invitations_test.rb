@@ -23,25 +23,22 @@ class EventInvitationsTest < ActiveSupport::TestCase
     assert @event.invitees.respond_to?(:accepted)
     assert @event.invitees.respond_to?(:rejected)
   end
-  test "event invitations counter increase on create,  and decrease on delete invitation" do
+  test "event invitations counter increase on create and decrease on delete invitation" do
     assert_equal(0, @event.invitees.pending.to_s.count)
     assert_equal(@event, @event.invitees.owner)
     @event.invitees << @invitation
     assert_equal(1, @event.invitees.pending.count)
+    
+    @invitation.destroy
+    assert_equal(0, @event.invitees.pending.count(:force => true))
   end
   test "event invitations counter decrease/increase on update" do
     @event.invitees << @invitation
-    @invitation.reload
+    assert_equal(1, @event.invitees.pending.count)
     @invitation.update_attribute(:estat, Invitation::STATUS[:accepted])
     assert_equal([:pending, :accepted], Counter.all.map{|c| c.name.to_sym })
     assert_equal(0, @event.invitees.pending.count(:force => true))
     assert_equal(1, @event.invitees.accepted.count(:force => true))
     assert_equal(:accepted, @invitation.status.current.name)
-  end
-  test "event invitations counter decrease on destroy" do
-    @event.invitees << @invitation
-    @invitation.reload
-    @invitation.destroy
-    assert_equal(0, @event.invitees.pending.count(:force => true))
   end
 end

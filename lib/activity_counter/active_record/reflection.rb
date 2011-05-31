@@ -13,7 +13,7 @@ module ActiveRecord
         end
       end
       def status_column_name
-        (is_belongs_to? and (options[:status_field] or :status).to_sym) or reverseme.status_column_name
+        (belongs_to? and (options[:status_field] or :status).to_sym) or reverseme.status_column_name
       end
       def load_default_counters
         @default_counters = []
@@ -31,12 +31,9 @@ module ActiveRecord
         end
       end
       def has_status_counter?
-        (is_belongs_to? and options[:counter_cache] and options[:counter_cache].reject{|k,v| k == :default }.keys.count > 1)
+        (belongs_to? and options[:counter_cache] and options[:counter_cache].reject{|k,v| k == :default }.keys.count > 1)
       end
       private
-      def is_belongs_to?
-        macro == :belongs_to
-      end
       def reverse_class
         klass
       end

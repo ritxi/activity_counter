@@ -2,32 +2,43 @@ module ActivityCounter
   module Model
     module Cached
       module ClassMethods
-        
+
         def define_class_accessor(name, default=nil)
           unless respond_to?(name)
             class_eval <<-MAGIC
               @@#{name} = #{default.inspect}
-              def #{name}=(name)
+              def self.#{name}=(name)
                 @@#{name} = name
               end
-              def #{name}
+              def self.#{name}
                 @@#{name}
               end
             MAGIC
           end
         end
+        
         ## Add status_update methods and trigger them to their events
         def configure_cached_class(reflection)
-          {
-            :status_column_name => reflection.status_column_name,
-            :reflection_name => reflection.name
-          }.each_pair{ |name,value| define_class_accessor(name, value) }
+          status_column_name= reflection.status_column_name
+          reflection_name= reflection.name
 
           send(:include, InstanceMethods)
           reflection.load_default_counters
           define_status_counters if reflection.has_status_counter?
           #define_default_counters
         end
+        
+        alias_method :original_method_missing, :method_missing
+        def method_missing(name, *args)
+          default_methods = { :status_column_name => :status, :reflection_name => nil }
+          if default_methods.keys.include?(name)
+            define_class_accessor(name, default_methods[name])
+            send name
+          else
+            original_method_missing(name, args)
+          end
+        end
+
         private
         def define_status_counters
           # Custom status based counters
@@ -38,9 +49,9 @@ module ActivityCounter
         def define_default_counters(counters)
           counters.each do |counter|
             case counter
-            when :total then define_total_counter
-            when :new_default then define_new_default
-            when :new_simple  then define_new_simple
+              when :total then define_total_counter
+              when :new_default then define_new_default
+              when :new_simple  then define_new_simple
             end
           end
         end
@@ -68,15 +79,18 @@ module ActivityCounter
         
       module InstanceMethods
         def status_column_name
-          self.class.status_column_name
+          @status_column_name ||= status.status_field
+        end
+        def reflection_name
+          # at this moment only one is expected, is ready to accept more
+          @reflection_name ||= find_status_reflections.first.name
         end
         def status
-          @status ||= Status.new(self, self.class.reflection_name)
+          @status ||= Status.new(self, reflection_name)
           @status = @status.send(:call, self)
           @status
         end
         def after_create_update_default_counter
-          puts "estatus column: #{status_column_name}"
           if self[status_column_name].nil? && !status.default.nil?
             self[status_column_name] = status.default
             status.should_not_update!
@@ -111,7 +125,14 @@ module ActivityCounter
             super
           end
         end
-
+        
+        private
+        def find_status_reflections
+          @status_reflections ||= []
+          @status_reflections.empty? and self.class.reflections.each_pair{ |name,reflection|
+            reflection.has_status_counter? and @status_reflections << reflection }
+          @status_reflections
+        end
         # It represents the "status" column for the current instance
         # .status => this name might change
         #   .list                 => known statuses list
@@ -123,9 +144,9 @@ module ActivityCounter
         #   .after                => after update status name
         #   .cached_class_name    => class name of the class containing status (Invitation in this case)
         #   .cached_relation_name => belongs_to relation name
-        #   .changes              => changes if any on the status column
+        #   .changes              => changes on the status column
         class Status
-          attr_reader :record, :reflection, :status_field
+          attr_reader :record, :reflection
 
           def initialize(record, reflection_name)
             @counter = {}
@@ -133,8 +154,10 @@ module ActivityCounter
             @reflection = reflection_for(reflection_name)
             @owner = @record.send(@reflection.name)
             @statuses = @reflection.options[:counter_cache].reject{|status,value| status == :default }
-            @status_field = @record.status_column_name
             @should_update = true
+          end
+          def status_field
+            @status_field ||= reflection_for(record.reflection_name).status_column_name
           end
           def list
             @statuses
@@ -214,6 +237,7 @@ module ActivityCounter
             (reflection.nil? and raise "Reflection #{name} not found for #{record.class.to_s} Class") or reflection
           end
         end
+        
       end
     end
   end

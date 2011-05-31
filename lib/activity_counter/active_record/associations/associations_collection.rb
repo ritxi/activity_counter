@@ -16,19 +16,6 @@ module ActiveRecord
         @internal_counter = InternalCounter.new(@owner, @reflection, self)
         @defaults = @counter_cache_options[:default]
         @default_counters = []
-        if @defaults == true
-          @default_counters = [:total, :new_default]
-        elsif @defaults.is_a?(Array)
-          @defaults.each do |default|
-            case default
-            when :total then @default_counters << :total
-            when :new then @default_counters << :new_default
-            when :new_default then @default_counters << :new_default
-            when :new_simple then @default_counters << :new_simple
-            end
-          end
-        end
-        define_default_counters(@default_counters)
       end
       alias_method :rails_method_missing, :method_missing
       def method_missing(method, *args)

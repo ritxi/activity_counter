@@ -2,33 +2,39 @@ module ActivityCounter
   module Model
     module Cached
       module ClassMethods
-        @@status_column_name = :status
-        @@reflection_name = nil
-        def reflection_name=(name)
-          @@reflection_name = name
-        end
-        def reflection_name
-          @@reflection_name
-        end
-        def status_column_name=(name)
-          @@status_column_name = name
-        end
-        def status_column_name
-          @@status_column_name
+        
+        def define_class_accessor(name, default=nil)
+          unless respond_to?(name)
+            class_eval <<-MAGIC
+              @@#{name} = #{default.inspect}
+              def #{name}=(name)
+                @@#{name} = name
+              end
+              def #{name}
+                @@#{name}
+              end
+            MAGIC
+          end
         end
         ## Add status_update methods and trigger them to their events
         def configure_cached_class(reflection)
-          self.status_column_name= reflection.status_column_name
-          self.reflection_name= reflection.name
+          {
+            :status_column_name => reflection.status_column_name,
+            :reflection_name => reflection.name
+          }.each_pair{ |name,value| define_class_accessor(name, value) }
+
           send(:include, InstanceMethods)
-          
+          reflection.load_default_counters
+          define_status_counters if reflection.has_status_counter?
+          #define_default_counters
+        end
+        private
+        def define_status_counters
           # Custom status based counters
           after_create   :update_status_counter_on_create
           after_update   :update_status_counter_on_change
           before_destroy :update_status_counter_on_destroy
-          
         end
-        private
         def define_default_counters(counters)
           counters.each do |counter|
             case counter
@@ -43,13 +49,11 @@ module ActivityCounter
           after_create   {|item| item.total.increase}
           before_destroy {|item| item.total.decrease}
         end
-
         def define_new_default
           send :include, DefaultCounters
           after_create {|item| item.counter_new.increase }
           after_update :decrease_new_on_updated_at_distinct_of_created_at
         end
-
         def define_new_simple
           after_create {|item| item.counter_new.increase }
         end
@@ -72,7 +76,8 @@ module ActivityCounter
           @status
         end
         def after_create_update_default_counter
-          if self[status_column_name].nil?
+          puts "estatus column: #{status_column_name}"
+          if self[status_column_name].nil? && !status.default.nil?
             self[status_column_name] = status.default
             status.should_not_update!
             save
@@ -93,9 +98,7 @@ module ActivityCounter
         def update_status_counter_on_destroy
           status.current.decrease
         end
-        
-        
-        
+
         def method_missing(name, *args)
           if name == self.class.status_column_name
             eval <<-MAGIC
@@ -122,7 +125,7 @@ module ActivityCounter
         #   .cached_relation_name => belongs_to relation name
         #   .changes              => changes if any on the status column
         class Status
-          attr_reader :record, :reflection, :name, :status_field
+          attr_reader :record, :reflection, :status_field
 
           def initialize(record, reflection_name)
             @counter = {}
@@ -147,9 +150,6 @@ module ActivityCounter
           end
           def current
             counter
-          end
-          def name
-            #counter
           end
           def after
             changed? and counter_by_value(changes.last)
@@ -210,7 +210,8 @@ module ActivityCounter
             @counter[name] ||= ::Counter.create_or_retrieve(:source => @owner, :auto => @reflection, :name => name)
           end
           def reflection_for(name)
-            record.class.reflections[name]
+            reflection = record.class.reflections[name]
+            (reflection.nil? and raise "Reflection #{name} not found for #{record.class.to_s} Class") or reflection
           end
         end
       end

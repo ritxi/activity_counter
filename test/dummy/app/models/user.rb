@@ -6,5 +6,5 @@ class User < ActiveRecord::Base
   }
   has_many :events
   has_many :invitations, :dependent => :destroy
-  #belongs_to :site, :counter_cache => {:default => [:total, {:new => :unactive}]}.merge(STATUSES)
+  belongs_to :site, :counter_cache => {:default => [:total]}.merge(STATUSES)
 end

@@ -25,7 +25,7 @@ module ActivityCounter
           send(:include, InstanceMethods)
           reflection.load_default_counters
           define_status_counters if reflection.has_status_counter?
-          #define_default_counters
+          define_default_counters(reflection.default_counters) if reflection.has_default_counters?
         end
         
         alias_method :original_method_missing, :method_missing
@@ -35,7 +35,8 @@ module ActivityCounter
             define_class_accessor(name, default_methods[name])
             send name
           else
-            original_method_missing(name, args)
+            super
+            #original_method_missing(name, args)
           end
         end
 

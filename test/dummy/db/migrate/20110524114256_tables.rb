@@ -4,6 +4,7 @@ class Tables < ActiveRecord::Migration
       t.string :name
       t.string :email
       t.string  :status
+      t.integer :site_id
       t.timestamps
     end
     create_table :invitations, :force => true do |t|
@@ -26,7 +27,7 @@ class Tables < ActiveRecord::Migration
       t.integer :count, :default => 0
     end
     create_table :sites, :force => true do |t|
-      t.string  :user_id
+      t.string  :name
     end
   end
 

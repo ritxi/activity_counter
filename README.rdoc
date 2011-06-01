@@ -28,7 +28,7 @@
   
   :default => [:new] # it will define :new counter only
   
-  :default => [:new_simple, :new] # adds :new and :new_simple. This last one only counts new items, it's descreased manualy by calling reset!
+  :default => [:simple, :new] # adds :new and :simple. This last one only counts new items, it's descreased manualy by calling reset!
   
   
 == Custom counters by convention

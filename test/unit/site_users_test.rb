@@ -13,12 +13,27 @@ class EventInvitationsTest < ActiveSupport::TestCase
     
     @site.reload
     assert_equal(3, @site.users.count)
-    assert_equal(3, Counter.last.count)
-    
-    assert_equal(3, @site.users.total.count(:force => true))
+    assert_equal(3, @site.users.total.count)
     
     1.upto(2){ @site.users.last.destroy }
     @site.reload
     assert_equal(1, @site.users.total.count)
+  end
+  
+  test "new users counter" do
+    1.upto(3){@site.users << User.new}
+    assert_equal(3, @site.users.new.count)
+    User.first.activate!
+    @site.reload
+    assert_equal(2, @site.users.new.count)
+    assert_equal(1, @site.users.active.count)
+  end
+  
+  test "new simple counter" do
+    @site.users << @user
+    assert_equal(0, @user.messages.simple.count)
+    1.upto(3){ @user.messages << Message.new }
+    @user.reload
+    assert_equal(3, @user.messages.simple.count)
   end
 end

@@ -19,14 +19,13 @@ module ActiveRecord
         @default_counters = []
         @defaults ||= options[:counter_cache][:default]
         if @defaults == true
-          @default_counters = [:total, :new_default]
+          @default_counters = [:total, :new, :simple]
         elsif @defaults.is_a?(Array)
           @defaults.each do |default|
             case default
             when :total then @default_counters << :total
-            when :new then @default_counters << :new_default
-            when :new_default then @default_counters << :new_default
-            when :new_simple then @default_counters << :new_simple
+            when :new then @default_counters << :new
+            when :simple then @default_counters << :simple
             end
           end
         end

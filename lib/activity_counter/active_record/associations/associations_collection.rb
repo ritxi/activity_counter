@@ -27,7 +27,7 @@ module ActiveRecord
           @has_status_counter and @counter_cache_options.reject{ |key,value| key == :default }.keys.include?(method.to_sym)
         }
         is_default_counter = Proc.new{|method|
-          [:new, :total].include?(method)
+          [:new, :total, :simple].include?(method)
         }
         if is_status_counter.call(method) || is_default_counter.call(method)
           counter_name = method

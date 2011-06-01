@@ -6,5 +6,10 @@ class User < ActiveRecord::Base
   }
   has_many :events
   has_many :invitations, :dependent => :destroy
-  belongs_to :site, :counter_cache => {:default => [:total]}.merge(STATUSES)
+  has_many :messages
+  belongs_to :site, :counter_cache => {:default => true}.merge(STATUSES)
+  
+  def activate!
+    update_attribute(:status, STATUSES[:active])
+  end
 end

@@ -3,7 +3,7 @@ class Tables < ActiveRecord::Migration
     create_table :users, :force => true do |t|
       t.string :name
       t.string :email
-      t.string  :status
+      t.integer  :status
       t.integer :site_id
       t.timestamps
     end
@@ -28,6 +28,12 @@ class Tables < ActiveRecord::Migration
     end
     create_table :sites, :force => true do |t|
       t.string  :name
+    end
+    create_table :messages, :force => true do |t|
+      t.integer  :user_id
+      t.integer  :status
+      t.string :subject
+      t.text :body
     end
   end
 

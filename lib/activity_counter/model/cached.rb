@@ -1,3 +1,4 @@
+require 'active_support/basic_object'
 module ActivityCounter
   module Model
     module Cached
@@ -23,9 +24,8 @@ module ActivityCounter
           reflection_name= reflection.name
 
           send(:include, InstanceMethods)
-          reflection.load_default_counters
-          define_status_counters if reflection.has_status_counter?
-          define_default_counters(reflection) if reflection.has_default_counters?
+          define_status_counters(reflection) 
+          define_default_counters(reflection) 
         end
         
         alias_method :original_method_missing, :method_missing
@@ -41,49 +41,64 @@ module ActivityCounter
         end
 
         private
-        def define_status_counters
+        def define_status_counters(reflection)
           # Custom status based counters
-          after_create   :update_status_counter_on_create
-          after_update   :update_status_counter_on_change
-          before_destroy :update_status_counter_on_destroy
+          if reflection.has_status_counter?
+            after_create   :update_status_counter_on_create
+            after_update   :update_status_counter_on_change
+            before_destroy :update_status_counter_on_destroy
+          end
         end
         def define_default_counters(reflection)
-          reflection.default_counters.each do |counter|
-            case counter
-              when :total then define_total_counter(reflection)
-              when :new_default then define_new_default(reflection)
-              when :new_simple  then define_new_simple(reflection)
+          reflection.load_default_counters
+          if reflection.has_default_counters?
+            send :include, DefaultCounters
+            reflection.default_counters.each do |counter|
+              case counter
+                when :total then define_total_counter(reflection)
+                when :new then define_new(reflection)
+                when :simple  then define_simple(reflection)
+              end
             end
           end
         end
         def define_total_counter(reflection)
           # Default counters
-          after_create   {|item| item.collection_counter(reflection,:total).increase }
-          before_destroy {|item| item.collection_counter(reflection,:total).decrease }
+          after_create   { |item| item.increase_on_create(reflection) }
+          before_destroy { |item| item.collection_counter(reflection,:total).decrease }
         end
-        def define_new_default
-          send :include, DefaultCounters
-          after_create {|item| item.counter_new.increase }
-          after_update :decrease_new_on_updated_at_distinct_of_created_at
+        def define_new(reflection)
+          after_create { |item| item.increase_on_create(reflection, :new) }
+          after_update { |item| item.decrease_new_on_update(reflection) }
+          before_destroy { |item| item.decrease_new_on_destroy(reflection) }
         end
-        def define_new_simple
-          after_create {|item| item.counter_new.increase }
+        def define_simple(reflection)
+          after_create {|item| item.increase_on_create(reflection, :simple) }
         end
       end
       module DefaultCounters
-        def decrease_new_on_updated_at_distinct_of_created_at
-          if changes[:updated_at].first == created_at
-            counter_new.decrease
+        # types = *:new|:simple|:total
+        def increase_on_create(reflection, type=:total)
+          counter = collection_counter(reflection,type)
+          counter.increase
+        end
+        def decrease_new_on_update(reflection)
+          if changes[:updated_at] 
+            (changes[:updated_at].first == created_at) and collection_counter(reflection,:new).decrease
           end
+        end
+        def decrease_new_on_destroy(reflection)
+          self[:updated_at] == self[:created_at] and collection_counter(reflection,:new).decrease
         end
       end
         
       module InstanceMethods
         def collection_counter(reflection, counter_name)
+          collection = send(reflection.name).send(reflection.reverseme.name)
           case counter_name
-            when :total then send(reflection.name).send(reflection.reverseme.name).total.send(:counter)
-            when :new then send(reflection.name).send(reflection.reverseme.name).new.send(:counter)
-            when :simple_new then send(reflection.name).send(reflection.reverseme.name).simple.send(:counter)
+            when :total then collection.total.send(:counter)
+            when :new then collection.new.send(:counter) # New default
+            when :simple then collection.simple.send(:counter) # New simple
           end
         end
         def status_column_name
@@ -155,9 +170,8 @@ module ActivityCounter
         #   .cached_class_name    => class name of the class containing status (Invitation in this case)
         #   .cached_relation_name => belongs_to relation name
         #   .changes              => changes on the status column
-        class Status
+        class Status < ActiveSupport::BasicObject
           attr_reader :record, :reflection
-
           def initialize(record, reflection_name)
             @counter = {}
             @record = record
@@ -172,14 +186,12 @@ module ActivityCounter
           def list
             @statuses
           end
-          def to_s
-            record[status_field]
-          end
+
           def default
             @default ||= read_default_status
           end
           def changed?
-            !changes.nil?
+            !changes.blank?
           end
           def current
             counter
@@ -216,7 +228,15 @@ module ActivityCounter
               @should_update
             end
           end
+
+          def method_missing(method, *args, &block)
+            record[status_field].send(method, *args, &block)
+          end
+          
           private
+          def proxy(method, *args)
+            record[status_field].send(method, *args)
+          end
           def call(record)
             @record = record
             self

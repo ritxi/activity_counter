@@ -25,7 +25,7 @@ module ActivityCounter
           send(:include, InstanceMethods)
           reflection.load_default_counters
           define_status_counters if reflection.has_status_counter?
-          define_default_counters(reflection.default_counters) if reflection.has_default_counters?
+          define_default_counters(reflection) if reflection.has_default_counters?
         end
         
         alias_method :original_method_missing, :method_missing
@@ -47,19 +47,19 @@ module ActivityCounter
           after_update   :update_status_counter_on_change
           before_destroy :update_status_counter_on_destroy
         end
-        def define_default_counters(counters)
-          counters.each do |counter|
+        def define_default_counters(reflection)
+          reflection.default_counters.each do |counter|
             case counter
-              when :total then define_total_counter
-              when :new_default then define_new_default
-              when :new_simple  then define_new_simple
+              when :total then define_total_counter(reflection)
+              when :new_default then define_new_default(reflection)
+              when :new_simple  then define_new_simple(reflection)
             end
           end
         end
-        def define_total_counter
+        def define_total_counter(reflection)
           # Default counters
-          after_create   {|item| item.total.current.increase}
-          before_destroy {|item| item.total.current.decrease}
+          after_create   {|item| item.collection_counter(reflection,:total).increase }
+          before_destroy {|item| item.collection_counter(reflection,:total).decrease }
         end
         def define_new_default
           send :include, DefaultCounters
@@ -79,6 +79,13 @@ module ActivityCounter
       end
         
       module InstanceMethods
+        def collection_counter(reflection, counter_name)
+          case counter_name
+            when :total then send(reflection.name).send(reflection.reverseme.name).total.send(:counter)
+            when :new then send(reflection.name).send(reflection.reverseme.name).new.send(:counter)
+            when :simple_new then send(reflection.name).send(reflection.reverseme.name).simple.send(:counter)
+          end
+        end
         def status_column_name
           @status_column_name ||= status.status_field
         end
@@ -91,6 +98,7 @@ module ActivityCounter
           @status = @status.send(:call, self)
           @status
         end
+        
         def after_create_update_default_counter
           if self[status_column_name].nil? && !status.default.nil?
             self[status_column_name] = status.default
@@ -131,7 +139,8 @@ module ActivityCounter
         def find_status_reflections
           @status_reflections ||= []
           @status_reflections.empty? and self.class.reflections.each_pair{ |name,reflection|
-            reflection.has_status_counter? and @status_reflections << reflection }
+            reflection.has_status_counter? and @status_reflections << reflection
+          }
           @status_reflections
         end
         # It represents the "status" column for the current instance

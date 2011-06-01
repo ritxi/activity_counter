@@ -17,6 +17,7 @@ module ActiveRecord
       end
       def load_default_counters
         @default_counters = []
+        @defaults ||= options[:counter_cache][:default]
         if @defaults == true
           @default_counters = [:total, :new_default]
         elsif @defaults.is_a?(Array)

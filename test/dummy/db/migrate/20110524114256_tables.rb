@@ -5,6 +5,7 @@ class Tables < ActiveRecord::Migration
       t.string :email
       t.integer  :status
       t.integer :site_id
+      t.integer :photos_count
       t.timestamps
     end
     create_table :invitations, :force => true do |t|
@@ -35,6 +36,14 @@ class Tables < ActiveRecord::Migration
       t.string :subject
       t.text :body
     end
+    create_table :photos, :force => true do |t|
+      t.string :description
+      t.integer  :user_id
+    end
+    create_table :videos, :force => true do |t|
+      t.string :description
+      t.integer  :user_id
+    end
   end
 
   def self.down
@@ -43,5 +52,8 @@ class Tables < ActiveRecord::Migration
     drop_table :invitations
     drop_table :users
     drop_table :sites
+    drop_table :messages
+    drop_table :photos
+    drop_table :videos
   end
 end

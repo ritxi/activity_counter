@@ -7,6 +7,8 @@ class User < ActiveRecord::Base
   has_many :events
   has_many :invitations, :dependent => :destroy
   has_many :messages
+  has_many :photos
+  has_many :videos
   belongs_to :site, :counter_cache => {:default => true}.merge(STATUSES)
   
   def activate!

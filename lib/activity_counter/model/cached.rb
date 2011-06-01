@@ -24,8 +24,8 @@ module ActivityCounter
           reflection_name= reflection.name
 
           send(:include, InstanceMethods)
-          define_status_counters(reflection) 
-          define_default_counters(reflection) 
+          define_status_counters(reflection)
+          define_default_counters(reflection)
         end
         
         alias_method :original_method_missing, :method_missing
@@ -123,7 +123,9 @@ module ActivityCounter
         end
         def update_status_counter_on_create
           after_create_update_default_counter
-          self.status.current.increase
+          if self.status.changed?
+            self.status.current.increase
+          end
         end
         def update_status_counter_on_change
           status.should_update? do

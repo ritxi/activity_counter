@@ -12,14 +12,17 @@ module ActiveRecord
       def initialize(owner, reflection)
         activity_count_initialize(owner, reflection)
         @counter_cache_options = reflection.reverseme.options[:counter_cache]
-        @defaults = {}
-        @has_status_counter = reflection.reverseme.has_status_counter?
-        if @has_status_counters
-          @counter_cache_options_without_default = @counter_cache_options.reject{ |key,value| key == :default }
-          @defaults = @counter_cache_options[:default]
+        @is_multiple_counter_cache = @counter_cache_options.is_a?(Hash)
+        if @is_multiple_counter_cache
+          @defaults = {}
+          @has_status_counter = reflection.reverseme.has_status_counter?
+          if @has_status_counters
+            @counter_cache_options_without_default = @counter_cache_options.reject{ |key,value| key == :default }
+            @defaults = @counter_cache_options[:default]
+          end
+          @internal_counter = InternalCounter.new(@owner, @reflection, self)
+          @default_counters = []
         end
-        @internal_counter = InternalCounter.new(@owner, @reflection, self)
-        @default_counters = []
       end
       
       def method_missing(method, *args)
@@ -29,7 +32,7 @@ module ActiveRecord
         is_default_counter = Proc.new{|method|
           [:new, :total, :simple].include?(method)
         }
-        if is_status_counter.call(method) || is_default_counter.call(method)
+        if @is_multiple_counter_cache && (is_status_counter.call(method) || is_default_counter.call(method))
           counter_name = method
           eval <<-MAGIC
             def #{counter_name.to_s}

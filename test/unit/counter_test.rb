@@ -27,11 +27,8 @@ class CounterTest < ActiveSupport::TestCase
   end
   
   test "have all attributes set" do
-    counter = new_counter(@event, nil, :source_relation => :invitees)
-    assert !counter.save
-    assert_equal counter.errors.keys, [:name]
-    counter.name = 'invitees'
-    assert counter.save
+    error = assert_raise(RuntimeError) { counter = new_counter(@event, nil, :source_relation => :invitees) }
+    assert_equal error.message, "missing parameter name at Class.generate method"
   end
   
   test 'increase/decrease counter by 1' do

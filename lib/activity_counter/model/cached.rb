@@ -58,8 +58,8 @@ module ActivityCounter
         end
         def define_total_counter
           # Default counters
-          after_create   {|item| item.total.increase}
-          before_destroy {|item| item.total.decrease}
+          after_create   {|item| item.total.current.increase}
+          before_destroy {|item| item.total.current.decrease}
         end
         def define_new_default
           send :include, DefaultCounters
@@ -176,7 +176,10 @@ module ActivityCounter
             counter
           end
           def after
-            changed? and counter_by_value(changes.last)
+            if changed?
+              counter = counter_by_value(changes.last)
+              counter
+            end
           end
           def before
             changed? and counter_by_value(changes.first)
@@ -224,13 +227,16 @@ module ActivityCounter
           end
           def status_name_for(value)
             @statuses_invert ||= list.invert
-            @statuses_invert[value]
+            name = @statuses_invert[value.to_i]
+            name
           end
           def counter_by_value(value)
             counter(status_name_for(value))
           end
           def counter(name=nil)
-            name = status_name_for(self.to_s) unless name
+            unless name
+              name = status_name_for(self.to_s)
+            end
             @counter[name] ||= ::Counter.create_or_retrieve(:source => @owner, :auto => @reflection, :name => name)
           end
           def reflection_for(name)

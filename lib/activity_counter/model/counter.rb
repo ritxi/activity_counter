@@ -10,11 +10,11 @@ module ActivityCounter
         def create_or_retrieve(*options)
           dirty_options = options.first
           options_cleaned = cleanup_params(dirty_options)
-          counter = self.where(options_cleaned).first
-          if counter.blank?
+          counter = self.where(options_cleaned)
+          if counter.empty?
             generate!(options_cleaned)
           else
-            counter
+            counter.first
           end
         end
         
@@ -62,6 +62,7 @@ module ActivityCounter
         def cleanup_params(*options)
           options = options.first
           missing = keep_missing(options)
+          
           unless missing.blank?
             [:source, [:reverse, :auto, :reflection, :source_relation], :name].each do |expected|
               if expected.is_a?(Array)
@@ -74,16 +75,16 @@ module ActivityCounter
             options = split_source(options)
             options = find_reflection_name(options)
           end
+          #puts "Options cleaned: #{options.inspect}"
           options
         end
         def generate!(*options)
-          counter = generate(options.first)
-          counter.save
-          counter
+          params = cleanup_params(options.first)
+          self.create(params)
         end
         private
         def keep_missing(given_options)
-          [:source_id, :source_class, :source_relation, :name].reject{|option| given_options.include?(option)}
+          [:source_id, :source_class, :source_relation, :name].reject{|option| given_options.keys.include?(option) && !given_options[option].nil? }
         end
         def validate_one_is_present(expected, given_options)
           found = expected.reject{|new_option| !given_options.keys.include?(new_option)}
@@ -94,7 +95,7 @@ module ActivityCounter
           end
         end
         def validate_option(options, option)
-          unless options.keys.include?(option)
+          if !options.keys.include?(option) || options[option].nil?
             raise "missing parameter #{option} at #{self.class.to_s}.generate method"
           end
         end
@@ -123,15 +124,18 @@ module ActivityCounter
           source.send(source_relation)
         end
         def increase
-          self.class.increment_counter(:count, self[:id])
-          counter_changed!
+          #puts "up!"
+          up = self.class.increment_counter(:count, self[:id])
+          (up == 1 and counter_changed!) or puts "ep que no funciona"
         end
         def decrease
-          self.class.decrement_counter(:count, self[:id])
-          counter_changed!
+          #puts "down!"
+          down = self.class.decrement_counter(:count, self[:id])
+          (down == 1 and counter_changed!) or puts "ep que no funciona"
         end
-        def count
-          if counter_changed?
+        def count(options={})
+          options = {:force => false}.merge(options)
+          if counter_changed? || options[:force]
             counter_unchanged!
             self.reload
           end

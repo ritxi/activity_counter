@@ -31,7 +31,7 @@ module ActiveRecord
         end
       end
       def has_default_counters?
-        belongs_to? and options[:counter_cache] and options[:counter_cache].is_a?(Hash) and options[:counter_cache][:default]
+        (belongs_to? and options[:counter_cache] and options[:counter_cache].is_a?(Hash) and options[:counter_cache][:default])
       end
       def has_status_counter?
         (belongs_to? and options[:counter_cache] and options[:counter_cache].reject{|k,v| k == :default }.keys.count > 1)

@@ -65,7 +65,8 @@ module ActiveRecord
         end
         def count(options={})
           options = {:force => false}.merge(options)
-          options[:force] ? self.to_s.count : counter.count
+          options[:force] and counter.reload
+          counter.count
         end
         private
         def call(counter_name)
@@ -73,7 +74,9 @@ module ActiveRecord
           self
         end
         def counter
-          @counter[@current_counter] ||= Counter.create_or_retrieve(:source => @owner, :auto => @reflection, :name => @current_counter)
+          params = {:source => @owner, :auto => @reflection, :name => @current_counter}
+          @counter[@current_counter] ||= Counter.create_or_retrieve(params)
+          
         end
       end
     end

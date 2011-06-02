@@ -36,6 +36,7 @@ class CounterTest < ActiveSupport::TestCase
     counter.save
     assert_equal 0, counter.count
     
+    counter.not_reloaded!
     counter.increase
     assert_equal 1, counter.count
     

@@ -21,7 +21,7 @@ class EventInvitationsTest < ActiveSupport::TestCase
   end
   
   test "new users counter" do
-    1.upto(3){@site.users << User.new}
+    3.times { @site.users << User.new }
     assert_equal(3, @site.users.new.count)
     User.first.activate!
     @site.reload
@@ -32,8 +32,7 @@ class EventInvitationsTest < ActiveSupport::TestCase
   test "new simple counter" do
     @site.users << @user
     assert_equal(0, @user.messages.simple.count)
-    1.upto(3){ @user.messages << Message.new }
-    @user.reload
+    3.times { @user.messages << Message.new }
     assert_equal(3, @user.messages.simple.count)
   end
 end

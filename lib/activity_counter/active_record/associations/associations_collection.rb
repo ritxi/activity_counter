@@ -23,19 +23,21 @@ module ActiveRecord
           @default_counters = []
         end
       end
-      
+      def call_counter(name)
+        @internal_counter.send(:call, name, scoped)
+      end
       def method_missing(method, *args)
-        is_status_counter = Proc.new{|method|
+        is_status_counter = Proc.new{ |method|
           @has_status_counter and @counter_cache_options.reject{ |key,value| key == :default }.keys.include?(method.to_sym)
         }
-        is_default_counter = Proc.new{|method|
+        is_default_counter = Proc.new{ |method|
           [:new, :total, :simple].include?(method)
         }
         if @is_multiple_counter_cache && (is_status_counter.call(method) || is_default_counter.call(method))
           counter_name = method
           eval <<-MAGIC
             def #{counter_name.to_s}
-              @internal_counter.send(:call, #{counter_name.inspect}, scoped)
+              call_counter #{counter_name.inspect}
             end
           MAGIC
           send(counter_name)
@@ -61,15 +63,14 @@ module ActiveRecord
           when :total then
             @collection
           when :new then
-            @collection.where('created_at = updated_at')
+            @collection.where("created_at = updated_at")
           else
             @collection.where( @status_column => @counter_caches[@current_counter] )
           end
         end
         def count(options={})
           options = {:force => false}.merge(options)
-          options[:force] && options[:force] == :db ? inspect.count : counter.reload
-          counter.count
+          (options[:force] && options[:force] == :db ? inspect.count : (counter.reload and counter.count))
         end
         private
         def call(counter_name, collection)

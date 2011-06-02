@@ -3,21 +3,17 @@ module ActivityCounter
     module Counter
       module ClassMethods
         def validate_counter
-          send :validates_uniqueness_of, :name, :scope => [:source_class, :source_id, :source_relation], :on => :create
-          send :validates_presence_of, :source_class, :source_id, :source_relation, :name
+          validates_uniqueness_of :name, :scope => [:source_class, :source_id, :source_relation], :on => :create
+          validates_presence_of :source_class, :source_id, :source_relation, :name
+          after_create {|counter| counter.reload_count! }
         end
         
         def create_or_retrieve(*options)
           dirty_options = options.first
           options_cleaned = cleanup_params(dirty_options)
           counter = self.where(options_cleaned)
-          if counter.empty?
-            counter = generate!(options_cleaned)
-            counter
-          else
-            counter = counter.first
-            counter
-          end
+          counter =  counter.empty? ? generate!(options_cleaned) : counter.first
+          counter
         end
         
         def generate(*options)
@@ -113,22 +109,39 @@ module ActivityCounter
         def counter_unchanged!
           @counter_changed = false
         end
+        def name
+          self[:name].to_sym
+        end
         def source
           eval("#{source_class}.find(#{source_id})")
         end
         def reset!
           update_attribute(:count, 0)
         end
-        def reload!
-          new_count = cached_items.send(name).count
-          update_attribute(:count, new_count) unless new_count == self[:count]
+        def reload_count!
+          new_count = cached_items.inspect.count
+          (new_count == self[:count]) or update_attribute(:count, new_count)
+          reloaded!
+        end
+        def reloaded!
+          @reloaded = true
+        end
+        def not_reloaded!
+          @reloaded = false
+        end
+        def reloaded?
+          @reloaded
         end
         def cached_items
-          source.send(source_relation)
+          source.send(source_relation).send(:call_counter, self[:name])
         end
         def increase
-          up = self.class.increment_counter(:count, self[:id])
-          (up == 1 and counter_changed!)
+          unless reloaded?
+            up = self.class.increment_counter(:count, self[:id])
+            (up == 1 and counter_changed!)
+          else
+            not_reloaded!
+          end
         end
         def decrease
           down = self.class.decrement_counter(:count, self[:id])
@@ -139,8 +152,10 @@ module ActivityCounter
           if counter_changed? || options[:force]
             counter_unchanged!
             self.reload
+            (options[:force] == :db and cached_items.count(:force => :db)) or self[:count]
+          else
+            self[:count]
           end
-          self[:count]
         end
       end
     end

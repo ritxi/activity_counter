@@ -42,7 +42,6 @@ module ActivityCounter
         def define_status_counters(reflection)
           # Custom status based counters
           if reflection.has_status_counter?
-            before_save    :after_create_update_default_counter, :on => :create
             after_create   :update_status_counter_on_create
             after_update   :update_status_counter_on_change
             before_destroy :update_status_counter_on_destroy
@@ -89,6 +88,15 @@ module ActivityCounter
         def decrease_new_on_destroy(reflection)
           self[:updated_at] == self[:created_at] and collection_counter(reflection,:new).decrease
         end
+        
+        def after_create_update_default_counter
+          if self[status_column_name].blank? && !status.default.nil?
+            self[status_column_name] = status.default
+            status.should_not_update!
+            save
+          end
+        end
+        
       end
         
       module InstanceMethods
@@ -113,24 +121,16 @@ module ActivityCounter
           @status
         end
         
-        def after_create_update_default_counter
-          if self[status_column_name].blank? && !status.default.nil?
-            self[status_column_name] = status.default
-            #status.should_not_update!
-          end
-        end
+
         def update_status_counter_on_create
           after_create_update_default_counter
-          if self.status.changed?
-            self.status.current.increase
-          end
-          
+          status.current.increase
         end
         def update_status_counter_on_change
           status.should_update? do
             if status.changed?
               status.before.decrease
-              status.after.increase
+              status.current.increase
             end
           end
         end

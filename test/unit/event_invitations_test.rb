@@ -47,9 +47,9 @@ class EventInvitationsTest < ActiveSupport::TestCase
   end
   
   test "event invitation with more activity" do
-    1.upto(10){ @event.invitees << Invitation.new }
-    @event.reload
-    assert_equal 10, @event.invitees.pending.count(:force => :db)
+    assert_equal 0, @event.invitees.pending.count
+    10.times { @event.invitees << Invitation.new }
+    assert_equal 10, @event.invitees.pending.count
     @event.invitees.each do |invitation|
       current = TestHelper.cycle(Invitation::STATUS[:accepted], Invitation::STATUS[:rejected])
       invitation.update_attribute(:estat, current)

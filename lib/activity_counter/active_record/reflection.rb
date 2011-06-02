@@ -34,7 +34,7 @@ module ActiveRecord
         (belongs_to? and options[:counter_cache] and options[:counter_cache].is_a?(Hash) and options[:counter_cache][:default])
       end
       def has_status_counter?
-        (belongs_to? and options[:counter_cache] and options[:counter_cache].reject{|k,v| k == :default }.keys.count > 1)
+        (belongs_to? and options[:counter_cache] and options[:counter_cache].is_a?(Hash) and options[:counter_cache].reject{|k,v| k == :default }.keys.count > 1)
       end
       private
       def reverse_class

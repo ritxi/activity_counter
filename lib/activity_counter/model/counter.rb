@@ -12,9 +12,11 @@ module ActivityCounter
           options_cleaned = cleanup_params(dirty_options)
           counter = self.where(options_cleaned)
           if counter.empty?
-            generate!(options_cleaned)
+            counter = generate!(options_cleaned)
+            counter
           else
-            counter.first
+            counter = counter.first
+            counter
           end
         end
         
@@ -71,7 +73,6 @@ module ActivityCounter
                 validate_option(options, expected)
               end
             end
-            
             options = split_source(options)
             options = find_reflection_name(options)
           end
@@ -80,7 +81,9 @@ module ActivityCounter
         end
         def generate!(*options)
           params = cleanup_params(options.first)
-          self.create(params)
+          counter = self.create(params)
+          puts "Errors on counter: #{counter.errors.inspect}" unless counter.valid?
+          counter
         end
         private
         def keep_missing(given_options)
@@ -124,14 +127,12 @@ module ActivityCounter
           source.send(source_relation)
         end
         def increase
-          #puts "up!"
           up = self.class.increment_counter(:count, self[:id])
-          (up == 1 and counter_changed!) or puts "ep que no funciona"
+          (up == 1 and counter_changed!)
         end
         def decrease
-          #puts "down!"
           down = self.class.decrement_counter(:count, self[:id])
-          (down == 1 and counter_changed!) or puts "ep que no funciona"
+          (down == 1 and counter_changed!)
         end
         def count(options={})
           options = {:force => false}.merge(options)

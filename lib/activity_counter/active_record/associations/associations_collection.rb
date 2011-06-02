@@ -2,7 +2,7 @@ require 'active_record/associations/association_collection'
 module ActiveRecord
   module Associations
     class AssociationCollection < AssociationProxy
-      attr_reader :counter_cache_options_without_default, :default_counters
+      attr_reader :counter_cache_statuses_list, :default_counters
       def owner
         @owner
       end
@@ -15,11 +15,10 @@ module ActiveRecord
         @is_multiple_counter_cache = @counter_cache_options.is_a?(Hash)
         if @is_multiple_counter_cache
           @defaults = {}
-          @has_status_counter = reflection.reverseme.has_status_counter?
-          if @has_status_counters
-            @counter_cache_options_without_default = @counter_cache_options.reject{ |key,value| key == :default }
-            @defaults = @counter_cache_options[:default]
-          end
+          
+          @counter_cache_statuses_list = @counter_cache_options.reject{ |key,value| key == :default }
+          @has_status_counter = !@counter_cache_statuses_list.blank?
+          @defaults = @counter_cache_options[:default]
           @internal_counter = InternalCounter.new(@owner, @reflection, self)
           @default_counters = []
         end
@@ -36,7 +35,7 @@ module ActiveRecord
           counter_name = method
           eval <<-MAGIC
             def #{counter_name.to_s}
-              @internal_counter.send(:call, #{counter_name.inspect})
+              @internal_counter.send(:call, #{counter_name.inspect}, scoped)
             end
           MAGIC
           send(counter_name)
@@ -46,17 +45,18 @@ module ActiveRecord
       end
       private
 
-      class InternalCounter
+      class InternalCounter < ActiveSupport::BasicObject
         def initialize(owner, reflection, collection)
           @counter     ||= {}
           @owner         = owner
           @reflection    = reflection
-          @collection    = collection
+          @collection    = collection.scoped
+          
           @status_column = @reflection.status_column_name
           # statuses hash list
-          @counter_caches = collection.counter_cache_options_without_default
+          @counter_caches = collection.counter_cache_statuses_list
         end
-        def to_s
+        def inspect
           case @current_counter
           when :total then
             @collection
@@ -68,18 +68,23 @@ module ActiveRecord
         end
         def count(options={})
           options = {:force => false}.merge(options)
-          options[:force] and counter.reload
+          options[:force] && options[:force] == :db ? inspect.count : counter.reload
           counter.count
         end
         private
-        def call(counter_name)
+        def call(counter_name, collection)
           @current_counter = counter_name
+          @collection    = collection
           self
         end
         def counter
           params = {:source => @owner, :auto => @reflection, :name => @current_counter}
+          #puts "New counter params: #{params.inspect}"
           @counter[@current_counter] ||= Counter.create_or_retrieve(params)
           
+        end
+        def method_missing(method, *args, &block)
+          inspect.send(method, *args, &block)
         end
       end
     end

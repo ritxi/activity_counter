@@ -1,5 +1,6 @@
 require 'active_record/associations'
 require 'activity_counter/model/cached'
+require 'activity_counter/model/source'
 module ActiveRecord
   module Associations
     module ClassMethods
@@ -18,6 +19,10 @@ module ActiveRecord
       module MultipleCounter
         def self.add_multiple_counter_cache(reflection)
           reflection.active_record.send :extend, ActivityCounter::Model::Cached::ClassMethods
+          reverse = reflection.reverseme
+          reverse.active_record.send(:extend,  ActivityCounter::Model::Source::ClassMethods)
+          reverse.active_record.send(:include,  ActivityCounter::Model::Source::InstanceMethods)
+          reverse.active_record.configure_source_model
           reflection.active_record.configure_cached_class(reflection)
         end
       end

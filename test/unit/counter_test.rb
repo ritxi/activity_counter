@@ -49,4 +49,18 @@ class CounterTest < ActiveSupport::TestCase
     counter.decrease
     assert_equal 0, counter.count
   end
+  
+  test "counters are destroyed before source item" do
+    site = Site.create
+    site.users << User.new
+    assert_equal 1, site.users.total.count
+    
+    user = site.users.first
+    user.videos << Video.new
+    assert_equal 1, user.videos.total.count
+    
+    assert_equal 5, Counter.count
+    user.destroy
+    assert_equal 4, Counter.count
+  end
 end
